@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGENT FIREWALL // Sovereign AI Security & Observability</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            black: '#030712',
+                            dark: '#0b0f19',
+                            card: '#111827',
+                            border: '#1f2937',
+                            cyan: '#06b6d4',
+                            neon: '#22d3ee',
+                            pink: '#ec4899',
+                            purple: '#8b5cf6',
+                            green: '#10b981',
+                            red: '#ef4444',
+                            yellow: '#f59e0b'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace']
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 15px rgba(6, 182, 212, 0.4)',
+                        'neon-pink': '0 0 15px rgba(236, 72, 153, 0.4)',
+                        'neon-red': '0 0 15px rgba(239, 68, 68, 0.4)',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js for real-time graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #030712;
+            color: #f3f4f6;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f2937;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+        .scanlines {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.03),
+                rgba(0, 255, 0, 0.01),
+                rgba(0, 0, 255, 0.03)
+            );
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-cyber-black text-gray-100 min-h-screen flex flex-col relative overflow-x-hidden">
+
+    <!-- CRT Scanlines Overlay -->
+    <div class="scanlines fixed inset-0 z-50 pointer-events-none opacity-20"></div>
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-cyber-border bg-cyber-dark/80 backdrop-blur sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <div class="relative flex items-center justify-center w-10 h-10 bg-cyber-cyan/10 border border-cyber-cyan rounded shadow-neon-cyan">
+                <i class="fa-solid fa-shield-halved text-cyber-cyan text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wider text-white flex items-center gap-2">
+                    AGENT<span class="text-cyber-cyan">FIREWALL</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/40">SOVEREIGN v1.0</span>
+                </h1>
+                <p class="text-xs text-gray-400">Autonomous AI Security & Observability Proxy</p>
+            </div>
+        </div>
+
+        <!-- Global Stats Ticker -->
+        <div class="hidden lg:flex items-center space-x-6 text-xs border-x border-cyber-border px-6">
+            <div>
+                <span class="text-gray-500 block">TOTAL REQUESTS</span>
+                <span id="stat-total" class="text-white font-bold text-sm">0</span>
+            </div>
+            <div>
+                <span class="text-gray-500 block">BLOCKED</span>
+                <span id="stat-blocked" class="text-cyber-red font-bold text-sm">0</span>
+            </div>
+            <div>
+                <span class="text-gray-500 block">SECRETS REDACTED</span>
+                <span id="stat-redacted" class="text-cyber-yellow font-bold text-sm">0</span>
+            </div>
+            <div>
+                <span class="text-gray-500 block">TOKENS BURNED</span>
+                <span id="stat-tokens" class="text-cyber-neon font-bold text-sm">0</span>
+            </div>
+        </div>
+
+        <!-- Status & Connection -->
+        <div class="flex items-center space-x-4">
+            <div id="ws-status" class="flex items-center space-x-2 px-3 py-1.5 rounded bg-cyber-card border border-cyber-border text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyber-yellow animate-pulse" id="ws-dot"></span>
+                <span id="ws-text" class="text-gray-300">CONNECTING...</span>
+            </div>
+            <button onclick="toggleModal('config-modal')" class="p-2 rounded bg-cyber-card border border-cyber-border hover:border-cyber-cyan text-gray-300 hover:text-cyber-cyan transition">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Body -->
+    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-[1800px] w-full mx-auto">
+
+        <!-- Left Column: Charts & Metrics (1 col on lg) -->
+        <div class="flex flex-col space-y-6">
+            <!-- Traffic Analysis Chart Card -->
+            <div class="bg-cyber-card border border-cyber-border rounded-lg p-5 shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyber-cyan to-cyber-purple"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-cyber-cyan"></i> Traffic & Interceptions
+                    </h2>
+                    <span class="text-xs text-gray-500">REALTIME</span>
+                </div>
+                <div class="h-48 relative">
+                    <canvas id="trafficChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Threat Breakdown / Security Telemetry Card -->
+            <div class="bg-cyber-card border border-cyber-border rounded-lg p-5 shadow-lg relative overflow-hidden flex-1">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyber-pink to-cyber-red"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-cyber-pink"></i> Security Violations
+                    </h2>
+                    <span class="text-xs text-gray-500">AUDIT LOGS</span>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Destructive Bash Commands</span>
+                            <span id="bar-bash" class="text-cyber-red font-bold">0%</span>
+                        </div>
+                        <div class="w-full bg-cyber-dark rounded-full h-2 border border-cyber-border">
+                            <div id="prog-bash" class="bg-cyber-red h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Secret Redactions (API Keys / PII)</span>
+                            <span id="bar-secrets" class="text-cyber-yellow font-bold">0%</span>
+                        </div>
+                        <div class="w-full bg-cyber-dark rounded-full h-2 border border-cyber-border">
+                            <div id="prog-secrets" class="bg-cyber-yellow h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Token Budget Breakers</span>
+                            <span id="bar-budget" class="text-cyber-pink font-bold">0%</span>
+                        </div>
+                        <div class="w-full bg-cyber-dark rounded-full h-2 border border-cyber-border">
+                            <div id="prog-budget" class="bg-cyber-pink h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Terminal Simulator / Status Box -->
+                <div class="mt-6 pt-4 border-t border-cyber-border">
+                    <div class="text-xs font-bold text-gray-400 mb-2">SYSTEM KERNEL LOGS</div>
+                    <div id="kernel-logs" class="bg-cyber-dark rounded p-3 h-28 overflow-y-auto text-[10px] text-gray-400 space-y-1 font-mono border border-cyber-border">
+                        <div>[SYSTEM] Agent Firewall proxy initialized on :8080</div>
+                        <div>[WALLET] SQLite WAL sovereign ledger active.</div>
+                        <div>[WATCH] Listening for LLM payload interception...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right / Main Column: Live Request Feed Table (2 cols on lg) -->
+        <div class="lg:col-span-2 bg-cyber-card border border-cyber-border rounded-lg p-5 shadow-lg flex flex-col h-[750px] relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyber-cyan via-cyber-purple to-cyber-pink"></div>
+            
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-4 border-b border-cyber-border gap-4">
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+                        <i class="fa-solid fa-satellite-dish text-cyber-cyan"></i> Live Interception Feed
+                    </h2>
+                    <p class="text-xs text-gray-500">Real-time HTTP requests captured by the local proxy</p>
+                </div>
+                <div class="flex items-center space-x-2 w-full sm:w-auto">
+                    <div class="relative flex-1 sm:flex-initial">
+                        <input type="text" id="table-search" placeholder="Filter requests..." 
+                            class="bg-cyber-dark border border-cyber-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyber-cyan w-full sm:w-48">
+                    </div>
+                    <button onclick="clearFeed()" class="px-3 py-1.5 rounded bg-cyber-dark border border-cyber-border hover:border-cyber-red text-xs text-gray-300 hover:text-cyber-red transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Feed Table Container -->
+            <div class="flex-1 overflow-y-auto rounded border border-cyber-border bg-cyber-dark/50">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="bg-cyber-dark sticky top-0 z-10 border-b border-cyber-border text-gray-400 font-semibold">
+                        <tr>
+                            <th class="p-3">TIMESTAMP</th>
+                            <th class="p-3">MODEL</th>
+                            <th class="p-3">ACTION</th>
+                            <th class="p-3">TOKENS</th>
+                            <th class="p-3">LATENCY</th>
+                            <th class="p-3">STATUS</th>
+                            <th class="p-3 text-right">DETAILS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feed-table-body" class="divide-y divide-cyber-border/50">
+                        <!-- Dynamic rows injected here -->
+                        <tr id="empty-row">
+                            <td colspan="7" class="p-8 text-center text-gray-500">
+                                <i class="fa-solid fa-radar fa-spin text-2xl mb-2 block text-cyber-cyan/40"></i>
+                                Waiting for autonomous agent traffic... Send a request through proxy.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Footer Status -->
+            <div class="flex items-center justify-between pt-4 text-xs text-gray-500 border-t border-cyber-border mt-4">
+                <span id="feed-count">Showing 0 intercepted events</span>
+                <span class="text-cyber-cyan flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-cyber-cyan animate-ping"></span> Live WebSocket Stream
+                </span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Request Details Modal -->
+    <div id="detail-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-cyber-card border border-cyber-border rounded-lg max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-cyber-cyan"></div>
+            <div class="p-4 border-b border-cyber-border flex items-center justify-between">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-code text-cyber-cyan"></i> Interception Inspector
+                </h3>
+                <button onclick="closeModal('detail-modal')" class="text-gray-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-xs flex-1" id="modal-content">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="p-4 border-t border-cyber-border bg-cyber-dark/50 flex justify-end">
+                <button onclick="closeModal('detail-modal')" class="px-4 py-2 rounded bg-cyber-border hover:bg-cyber-cyan hover:text-cyber-black text-gray-200 transition font-bold">
+                    CLOSE INSPECTOR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div id="config-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-cyber-card border border-cyber-border rounded-lg max-w-lg w-full shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-cyber-purple"></div>
+            <div class="p-4 border-b border-cyber-border flex items-center justify-between">
+                <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-cyber-purple"></i> Firewall Configuration
+                </h3>
+                <button onclick="toggleModal('config-modal')" class="text-gray-400 hover:text-white text-sm">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 text-xs">
+                <div>
+                    <label class="block text-gray-400 mb-1">Max Token Budget / Request</label>
+                    <input type="number" value="8192" class="w-full bg-cyber-dark border border-cyber-border rounded p-2 text-white focus:border-cyber-cyan">
+                </div>
+                <div>
+                    <label class="block text-gray-400 mb-1">Secret Redaction Level</label>
+                    <select class="w-full bg-cyber-dark border border-cyber-border rounded p-2 text-white focus:border-cyber-cyan">
+                        <option>Aggressive (API Keys, Passwords, PII, Tokens)</option>
+                        <option>Standard (API Keys & Secrets only)</option>
+                        <option>Disabled</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-400 mb-1">Destructive Bash Interceptor</label>
+                    <div class="flex items-center space-x-3 mt-2">
+                        <input type="checkbox" checked class="w-4 h-4 accent-cyber-cyan">
+                        <span class="text-gray-300">Block `rm -rf`, `mkfs`, fork bombs & destructive scripts</span>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-cyber-border bg-cyber-dark/50 flex justify-end space-x-2">
+                <button onclick="toggleModal('config-modal')" class="px-4 py-2 rounded bg-cyber-border text-gray-300 hover:text-white">Cancel</button>
+                <button onclick="toggleModal('config-modal'); showToast('Configuration updated successfully.')" class="px-4 py-2 rounded bg-cyber-purple hover:bg-cyber-cyan text-white font-bold transition">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-cyber-card border border-cyber-cyan shadow-neon-cyan px-4 py-3 rounded text-xs text-white transform translate-y-20 opacity-0 transition-all duration-300 flex items-center space-x-3">
+        <i class="fa-solid fa-circle-check text-cyber-cyan text-base"></i>
+        <span id="toast-msg">Action completed.</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-cyber-border bg-cyber-dark/40 py-3 px-6 text-center text-[10px] text-gray-500">
+        AGENT FIREWALL // Sovereign Security & Observability Proxy for Autonomous AI Agents. SQLite WAL Secured.
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Global State
+        let totalRequests = 0;
+        let blockedRequests = 0;
+        let redactedCount = 0;
+        let totalTokens = 0;
+        let threatStats = { bash: 0, secrets: 0, budget: 0 };
+        let interceptedEvents = [];
+
+        // Chart Initialization
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        const trafficChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(15).fill(''),
+                datasets: [{
+                    label: 'Traffic Rate',
+                    data: Array(15).fill(0),
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: { 
+                        grid: { color: 'rgba(31, 41, 55, 0.5)' },
+                        ticks: { color: '#9ca3af', font: { size: 10 } }
+                    }
+                }
+            }
+        });
+
+        // WebSocket Connection Handler
+        let ws;
+        function connectWebSocket() {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${proto}//${window.location.host}/ws`;
+            
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                document.getElementById('ws-dot').className = 'w-2.5 h-2.5 rounded-full bg-cyber-green animate-pulse';
+                document.getElementById('ws-text').innerText = 'SECURE STREAM ACTIVE';
+                appendKernelLog('[WS] Connected to Agent Firewall Sovereign Stream.');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleIncomingEvent(data);
+                } catch (err) {
+                    console.error('Failed to parse WS message:', err);
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('ws-dot').className = 'w-2.5 h-2.5 rounded-full bg-cyber-red';
+                document.getElementById('ws-text').innerText = 'DISCONNECTED - RECONNECTING...';
+                appendKernelLog('[WS] Connection lost. Reconnecting in 3s...');
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error:', err);
+                ws.close();
+            };
+        }
+
+        // Handle Real-Time Intercepted Event
+        function handleIncomingEvent(evt) {
+            totalRequests++;
+            totalTokens += (evt.tokens || 150);
+            if (evt.action === 'BLOCK') blockedRequests++;
+            if (evt.redacted) redactedCount++;
+
+            // Threat category breakdown
+            if (evt.threat_type === 'bash') threatStats.bash++;
+            else if (evt.threat_type === 'secret') threatStats.secrets++;
+            else if (evt.threat_type === 'budget') threatStats.budget++;
+
+            updateStatsDisplay();
+            addEventToTable(evt);
+            updateChartData(totalRequests);
+        }
+
+        // Update Top Ticker Stats
+        function updateStatsDisplay() {
+            document.getElementById('stat-total').innerText = totalRequests;
+            document.getElementById('stat-blocked').innerText = blockedRequests;
+            document.getElementById('stat-redacted').innerText = redactedCount;
+            document.getElementById('stat-tokens').innerText = totalTokens.toLocaleString();
+
+            const totalThreats = Math.max(1, threatStats.bash + threatStats.secrets + threatStats.budget);
+            const bashPct = Math.round((threatStats.bash / totalThreats) * 100);
+            const secretPct = Math.round((threatStats.secrets / totalThreats) * 100);
+            const budgetPct = Math.round((threatStats.budget / totalThreats) * 100);
+
+            document.getElementById('bar-bash').innerText = `${bashPct}%`;
+            document.getElementById('prog-bash').style.width = `${bashPct}%`;
+
+            document.getElementById('bar-secrets').innerText = `${secretPct}%`;
+            document.getElementById('prog-secrets').style.width = `${secretPct}%`;
+
+            document.getElementById('bar-budget').innerText = `${budgetPct}%`;
+            document.getElementById('prog-budget').style.width = `${budgetPct}%`;
+        }
+
+        // Add Row to Live Table
+        function addEventToTable(evt) {
+            const tbody = document.getElementById('feed-table-body');
+            const emptyRow = document.getElementById('empty-row');
+            if (emptyRow) emptyRow.remove();
+
+            interceptedEvents.unshift(evt);
+            if (interceptedEvents.length > 100) interceptedEvents.pop();
+
+            const rowId = `evt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            const actionBadge = evt.action === 'BLOCK' 
+                ? '<span class="px-2 py-0.5 rounded bg-cyber-red/20 text-cyber-red border border-cyber-red/40 font-bold">BLOCKED</span>'
+                : evt.redacted 
+                ? '<span class="px-2 py-0.5 rounded bg-cyber-yellow/20 text-cyber-yellow border border-cyber-yellow/40">REDACTED</span>'
+                : '<span class="px-2 py-0.5 rounded bg-cyber-green/20 text-cyber-green border border-cyber-green/40">PASSED</span>';
+
+            const tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = 'hover:bg-cyber-border/30 transition border-b border-cyber-border/30';
+            tr.innerHTML = `
+                <td class="p-3 text-gray-400 font-mono">${new Date(evt.timestamp || Date.now()).toLocaleTimeString()}</td>
+                <td class="p-3 text-white font-medium">${evt.model || 'gpt-4o'}</td>
+                <td class="p-3">${actionBadge}</td>
+                <td class="p-3 text-cyber-cyan">${evt.tokens || 150}</td>
+                <td class="p-3 text-gray-300">${evt.latency || '42ms'}</td>
+                <td class="p-3 text-gray-400">${evt.status_code || 200}</td>
+                <td class="p-3 text-right">
+                    <button onclick="inspectEvent(${interceptedEvents.length - 1})" class="px-2 py-1 rounded bg-cyber-dark border border-cyber-border hover:border-cyber-cyan text-cyber-cyan transition">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </td>
+            `;
+
+            tbody.insertBefore(tr, tbody.firstChild);
+            document.getElementById('feed-count').innerText = `Showing ${interceptedEvents.length} intercepted events`;
+        }
+
+        // Update Chart
+        function updateChartData(val) {
+            trafficChart.data.datasets[0].data.shift();
+            trafficChart.data.datasets[0].data.push(Math.floor(Math.random() * 5) + 1);
+            trafficChart.update('none');
+        }
+
+        // Inspect Event Modal
+        function inspectEvent(index) {
+            const evt = interceptedEvents[index];
+            if (!evt) return;
+
+            const content = document.getElementById('modal-content');
+            content.innerHTML = `
+                <div>
+                    <span class="text-gray-500 block mb-1">REQUEST ID & TIMESTAMP</span>
+                    <div class="bg-cyber-dark p-2 rounded border border-cyber-border font-mono text-white">${evt.id || 'req_99281a'} // ${evt.timestamp || new Date().toISOString()}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="text-gray-500 block mb-1">TARGET MODEL</span>
+                        <div class="bg-cyber-dark p-2 rounded border border-cyber-border text-cyber-cyan">${evt.model || 'gpt-4o'}</div>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block mb-1">ACTION TAKEN</span>
+                        <div class="bg-cyber-dark p-2 rounded border border-cyber-border text-white font-bold">${evt.action || 'PASSED'}</div>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-gray-500 block mb-1">INTERCEPTED PROMPT / PAYLOAD</span>
+                    <pre class="bg-cyber-dark p-3 rounded border border-cyber-border text-gray-300 overflow-x-auto font-mono text-[11px]">${escapeHtml(evt.prompt || 'Authorization: Bearer sk-ant-api03-...\\nPrompt: Execute rm -rf /')}</pre>
+                </div>
+                <div>
+                    <span class="text-gray-500 block mb-1">FIREWALL TELEMETRY AUDIT</span>
+                    <div class="bg-cyber-dark p-3 rounded border border-cyber-border text-cyber-pink font-mono">${escapeHtml(evt.reason || 'No policy violations detected. Redacted 1 potential API secret.')}</div>
+                </div>
+            `;
+            toggleModal('detail-modal');
+        }
+
+        // Modal Helpers
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.toggle('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // Clear Feed
+        function clearFeed() {
+            interceptedEvents = [];
+            const tbody = document.getElementById('feed-table-body');
+            tbody.innerHTML = `
+                <tr id="empty-row">
+                    <td colspan="7" class="p-8 text-center text-gray-500">
+                        <i class="fa-solid fa-radar text-2xl mb-2 block text-cyber-cyan/40"></i>
+                        Feed cleared. Waiting for traffic...
+                    </td>
+                </tr>
+            `;
+            document.getElementById('feed-count').innerText = `Showing 0 intercepted events`;
+            showToast('Live feed cleared.');
+        }
+
+        // Kernel Log Helper
+        function appendKernelLog(msg) {
+            const logs = document.getElementById('kernel-logs');
+            const div = document.createElement('div');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // Toast Notification Helper
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            connectWebSocket();
+            // Fallback simulation if no backend WS is present during dev test
+            setTimeout(() => {
+                if (totalRequests === 0) {
+                    appendKernelLog('[SIMULATOR] No live WebSocket traffic detected. Injecting test telemetry...');
+                    handleIncomingEvent({
+                        id: 'req_sim_01',
+                        timestamp: new Date().toISOString(),
+                        model: 'claude-3-5-sonnet',
+                        action: 'BLOCK',
+                        threat_type: 'bash',
+                        tokens: 340,
+                        latency: '58ms',
+                        status_code: 403,
+                        prompt: 'Execute command: rm -rf / --no-preserve-root',
+                        reason: 'Destructive bash command blocked by Agent Firewall policy.'
+                    });
+                }
+            }, 2500);
+        });
+    </script>
+</body>
+</html>

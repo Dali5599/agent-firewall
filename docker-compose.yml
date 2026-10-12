@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  agent-firewall:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-firewall
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - DATABASE_PATH=/app/data/audit_logs.db
+      - LOG_LEVEL=INFO
+      - SECRET_REDACTION_ENABLED=true
+      - BUDGET_LIMIT_USD=50.0
+      - DESTRUCTIVE_COMMAND_BLOCKING=true
+    volumes:
+      - firewall_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  firewall_data:
+    driver: local
